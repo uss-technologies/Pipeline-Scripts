@@ -1,0 +1,90 @@
+JAVAWEBAPPLICATION
+node {
+    def buildnumber= BUILD_NUMBER
+    stage ('git clone') {
+        git url : 'https://github.com/MithunTechnologiesDevOps/java-web-app-docker.git' , branch: 'master'
+    }
+    
+    stage ('build package') {
+        def mavenHome= tool name: "maven3.8.3",type: "maven"
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage ('build image') {
+        sh "docker build -t senoritahub/java-web-app:${buildnumber} ."
+    }
+    stage ('docker authentication') {
+        withCredentials([string(credentialsId: 'Docker_Hub_Pwd', variable: 'Docker_Hub_Pwd')]) {
+        sh 'docker login -u senoritahub -p ${Docker_Hub_Pwd}'
+        }
+    }
+    stage ('docker push') {
+        sh "docker push senoritahub/java-web-app:${buildnumber}"
+    }
+    stage ('docker deploy application to deploy server') {
+      sshagent(['Docker_Dep_Server']) {
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.15.252 docker rm -f javawebappcontainer || true"
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.15.252 docker run -d -p 8080:8080 --name javawebappcontainer senoritahub/java-web-app:${buildnumber} "
+      }
+    }
+   }
+
+MAVENWEBAPPLICATION 
+node {
+    def buildnumber= BUILD_NUMBER
+    stage ('Getting Source Code'){
+        git url: "https://github.com/MithunTechnologiesDevOps/maven-web-application.git", branch: "master"
+
+    }
+    stage ('Build Package'){
+    def mavenHome=tool name:"maven3.8.3", type:"maven"
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage ('Build Docker Image'){
+        sh "docker build -t senoritahub/maven-web-app:${buildnumber} ."
+    }
+    stage ('Docker Authentication'){
+        withCredentials([string(credentialsId: 'Docker_Hub_Pwd', variable: 'Dockerhubpwd')]) {
+        sh 'docker login -u senoritahub -p ${Dockerhubpwd}'
+     }
+        
+    }
+    stage ('Docker push image'){
+        sh "docker push senoritahub/maven-web-app:${buildnumber}"
+    }
+    stage ('Deploy image '){
+        sshagent(['Docker_Dep_Server']) {
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.15.252 docker rm -f mavenwebappcontainer || true"
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.15.252 docker run -d -p 8080:8080 --name mavenwebappcontainer senoritahub/maven-web-app:${buildnumber}"
+}
+    }
+}
+
+JAVAPROJECT-ECR
+node {
+    def buildnumber= BUILD_NUMBER
+    stage ('git clone') {
+        git url : 'https://github.com/MithunTechnologiesDevOps/java-web-app-docker.git' , branch: 'master'
+    }
+    
+    stage ('build package') {
+        def mavenHome= tool name: "maven3.8.3",type: "maven"
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage ('build image') {
+        sh "docker build -t 449551611923.dkr.ecr.ap-south-1.amazonaws.com/java-web-app:${buildnumber} ."
+    }
+     stage ('Ecr authentication') {
+        sh'aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 449551611923.dkr.ecr.ap-south-1.amazonaws.com'
+         }
+      stage ('docker push') {
+        sh "docker push 449551611923.dkr.ecr.ap-south-1.amazonaws.com/java-web-app:${buildnumber}"
+      }  
+      
+    stage ('docker deploy application to deploy server') {
+      sshagent(['ECR_DEPLOY']) {
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.43.13 docker rm -f javawebappcontainer || true"
+        sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.43.13 docker run -d -p 9080:8080 --name javawebappcontainer 449551611923.dkr.ecr.ap-south-1.amazonaws.com/java-web-app:${buildnumber} "
+         sh'aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 449551611923.dkr.ecr.ap-south-1.amazonaws.com'
+      }
+    }
+  }
